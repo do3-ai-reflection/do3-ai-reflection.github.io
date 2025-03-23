@@ -354,122 +354,92 @@
                 }
             });
             
-            // お問い合わせフォームの送信処理
-            const contactForm = document.querySelector('#contact-form form');
-            const hiddenIframe = document.querySelector('#hidden_iframe');
+            // フォーム送信処理
+            const form = document.querySelector('#contact-form form');
+            const iframe = document.getElementById('hidden_iframe');
+            let isSubmitting = false;
             
-            if (contactForm) {
-                // 送信成功時の表示
-                function showSuccessMessage() {
-                    const formContainer = document.querySelector('#contact-form .bg-white');
-                    formContainer.innerHTML = `
-                        <div class="text-center py-16 animate__animated animate__fadeIn">
-                            <div class="text-5xl text-green-500 mb-6">
-                                <i class="fas fa-check-circle"></i>
-                            </div>
-                            <h3 class="text-2xl font-bold mb-4">お問い合わせありがとうございました</h3>
-                            <p class="text-gray-600 mb-8">
-                                お問い合わせを受け付けました。<br>
-                                内容を確認の上、担当者より折り返しご連絡いたします。
-                            </p>
-                            <button id="resetForm" class="px-6 py-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition btn-pulse">
-                                フォームに戻る
-                            </button>
-                        </div>
-                    `;
-                    
-                    document.getElementById('resetForm').addEventListener('click', function() {
-                        location.reload();
-                    });
+            // iframeがロードされたときの処理
+            iframe.addEventListener('load', function() {
+                // 初回ページロード時は無視
+                if (document.readyState !== 'complete' || !isSubmitting) {
+                    return;
                 }
                 
-                // iframeのロードイベント処理を設定
-                let formSubmitted = false;
-                hiddenIframe.onload = function() {
-                    if (formSubmitted) {
-                        showSuccessMessage();
-                    }
-                };
-                
-                // フォーム送信処理
-                contactForm.addEventListener('submit', function(e) {
-                    // デフォルトの送信をキャンセル
+                // 送信成功時の処理
+                showSuccessMessage();
+            });
+            
+            // フォーム送信時の処理
+            form.addEventListener('submit', function(e) {
+                // 二重送信防止
+                if (isSubmitting) {
                     e.preventDefault();
-                    
-                    // フォームのデータを取得
-                    const company = document.getElementById('company').value;
-                    const name = document.getElementById('name').value;
-                    const email = document.getElementById('email').value;
-                    const message = document.getElementById('message').value;
-                    
-                    if (!company || !name || !email || !message) {
-                        alert('すべての項目を入力してください');
-                        return;
-                    }
-                    
-                    // フォームコンテナを取得して送信中表示に変更
-                    const formContainer = document.querySelector('#contact-form .bg-white');
-                    const originalFormHTML = formContainer.innerHTML;
-                    
-                    formContainer.innerHTML = `
-                        <div class="text-center py-20">
-                            <div class="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-blue-600 border-solid border-r-4 border-gray-200 mb-4"></div>
-                            <p class="text-gray-600 text-lg">送信中です...</p>
+                    return;
+                }
+                
+                // バリデーション
+                const company = document.getElementById('company').value;
+                const name = document.getElementById('name').value;
+                const email = document.getElementById('email').value;
+                const message = document.getElementById('message').value;
+                
+                if (!company || !name || !email || !message) {
+                    alert('すべての項目を入力してください');
+                    e.preventDefault();
+                    return;
+                }
+                
+                // 送信中フラグをセット
+                isSubmitting = true;
+                
+                // フォームはiframeに送信される (target="hidden_iframe"で設定済み)
+            });
+            
+            // 送信成功時のメッセージ表示
+            function showSuccessMessage() {
+                const formContainer = document.querySelector('#contact-form .bg-white');
+                formContainer.innerHTML = `
+                    <div class="text-center py-16 animate__animated animate__fadeIn">
+                        <div class="text-5xl text-green-500 mb-6">
+                            <i class="fas fa-check-circle"></i>
                         </div>
-                    `;
-                    
-                    // Google Forms送信用の関数
-                    function submitToGoogleForm() {
-                        const formAction = "https://docs.google.com/forms/d/e/1FAIpQLSejNvG7fFEQOqvaWkPB5WxtDpHVtin-AKHHXjJ_kRJmPuNMiA/formResponse";
-                        
-                        // 直接URLエンコードされたデータを作成
-                        const formData = new FormData();
-                        formData.append('entry.348510367', company);
-                        formData.append('entry.536838002', name);
-                        formData.append('entry.867650111', email);
-                        formData.append('entry.50615709', message);
-                        formData.append('fvv', '1');
-                        formData.append('fbzx', '-5161626323550921315');
-                        formData.append('pageHistory', '0');
-                        
-                        // フォームが送信されたフラグを設定
-                        formSubmitted = true;
-                        
-                        // XMLHttpRequestを使用
-                        const xhr = new XMLHttpRequest();
-                        xhr.open('POST', formAction, true);
-                        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-                        
-                        // 成功・失敗両方の場合に処理を行う
-                        xhr.onload = function() {
-                            // 常に成功として扱う（Googleフォームは常に200を返すため）
-                            showSuccessMessage();
-                        };
-                        
-                        xhr.onerror = function() {
-                            // エラー時の処理（タイムアウトなど）
-                            showSuccessMessage(); // エラーでも成功メッセージを表示（ユーザー体験向上のため）
-                        };
-                        
-                        // URLエンコードされた文字列に変換
-                        let urlEncodedData = '';
-                        for (const [name, value] of formData) {
-                            if (urlEncodedData) {
-                                urlEncodedData += '&';
-                            }
-                            urlEncodedData += encodeURIComponent(name) + '=' + encodeURIComponent(value);
-                        }
-                        
-                        // データを送信
-                        xhr.send(urlEncodedData);
-                    }
-                    
-                    // 少し遅延させて送信（ロード表示を見せるため）
-                    setTimeout(submitToGoogleForm, 500);
+                        <h3 class="text-2xl font-bold mb-4">お問い合わせありがとうございました</h3>
+                        <p class="text-gray-600 mb-8">
+                            お問い合わせを受け付けました。<br>
+                            内容を確認の上、担当者より折り返しご連絡いたします。
+                        </p>
+                        <button id="resetForm" class="px-6 py-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition btn-pulse">
+                            フォームに戻る
+                        </button>
+                    </div>
+                `;
+                
+                document.getElementById('resetForm').addEventListener('click', function() {
+                    location.reload();
                 });
             }
         });
     </script>
+<script>
+ window.difyChatbotConfig = {
+  token: 'Oisa2p0oOhhRSFBx'
+ }
+</script>
+<script
+ src="https://udify.app/embed.min.js"
+ id="Oisa2p0oOhhRSFBx"
+ defer>
+</script>
+<style>
+  #dify-chatbot-bubble-button {
+    background-color: #1C64F2 !important;
+  }
+  #dify-chatbot-bubble-window {
+    width: 24rem !important;
+    height: 40rem !important;
+  }
+</style>
 </body>
 </html>
 
